@@ -10,7 +10,7 @@ data often do)."
 
 So, based on the advice provided by the manual, I chose to group the data per single months of different years, so it can be used to 
 compare seasonal trends, per different countries, the kind of energy production, of flow and of units (because we can't compare apples 
-to bananas). The result is very granular, but it implies in facilitation on applications and regrouping the data. '''
+to bananas). The result is very granular, but it implies in facilitation on applications and regrouping the data.'''
 
 from io import BytesIO
 from zipfile import ZipFile
@@ -19,18 +19,11 @@ import csv
 import datetime
 import json
 
+
 def dateIso8601(period):
     date_time_obj = datetime.datetime.strptime(period, '%Y-%m').date()
     date_time = str(date_time_obj)
     return date_time
-
-def extractDataFromCsvList(data, column):
-    name = []
-    for row in data:
-        if row[column] not in name:
-            name.append(row[column])
-    name.pop(0)
-    return name
 
 resp = urlopen("https://www.jodidata.org/_resources/files/downloads/gas-data/jodi_gas_csv_beta.zip")
 zipfile = ZipFile(BytesIO(resp.read()))
@@ -41,46 +34,28 @@ for item in file_name_list:
     with open('{}'.format(item),'r', newline = '') as file:
         csvreader = csv.reader(file)
         data_csv = list(csvreader)
+data_csv.pop(0)
 
-data_no_header = []
+series_dict = {}
+
 for row in data_csv:
-    data_no_header.append(row)
-data_no_header.pop(0)
-
-month = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12']
-area_list = extractDataFromCsvList(data_csv, 0)
-energy_product = extractDataFromCsvList(data_csv, 2)
-flow_breakdown = extractDataFromCsvList(data_csv, 3)
-unit_measure = extractDataFromCsvList(data_csv, 4)
-
-for row in data_no_header:
     row[1] = row[1].split('-')
-
-
-for u in unit_measure:
-    for f in flow_breakdown:
-        for p in energy_product:
-            for country in area_list:
-                for m in month:
-                    list_date_points = []
-                    assesment_code = 0
-                    for data in data_no_header:
-                        if data[0] == country and data[1][1] == m and data[2] == p and data[3] == f and data[4] == u:
-                            list_d_p = [dateIso8601(data[1][0] + '-' + data [1][1]), float(data[5])]
-                            list_date_points.append(list_d_p)
-                            assesment_code = data[6]
-                    
-                    series_dict = { "series_id":datetime.datetime.strptime(m, "%m").strftime("%B") + "\\" + country +\
-                                  "\\" + p + "\\" + f + "\\" + u,
-                                  "points":list_date_points,
+    series_id = datetime.datetime.strptime(row[1][1], "%m").strftime("%B") + "\\" + row[0] +"\\" + row[2] + "\\" + row[3] + "\\" + row[4]
+    if series_id not in list(series_dict.keys()):
+        series_dict[series_id] = { "series_id":series_id,
+                                  "points":[],
                                   "fields":{
-                                      "country":country,
-                                      "energy_product":p,
-                                      "flow_breakdown":f,
-                                      "unit_measure":u,
-                                      "assessment_code":assesment_code     
+                                      "country":row[0],
+                                      "energy_product":row[2],
+                                      "flow_breakdown":row[3],
+                                      "unit_measure":row[4],
+                                      "assessment_code":row[6]    
                                   }
-                                }                          
-                    if series_dict["points"] != []:
-                        jsonString = json.dumps(series_dict)
-                        print(jsonString)
+                                }      
+    list_d_p = [dateIso8601(row[1][0] + '-' + row[1][1]), float(row[5])]
+    series_dict[series_id]["points"].append(list_d_p)
+
+for i in series_dict.values():
+    jsonString = json.dumps(i)
+    print(jsonString)
+ 
